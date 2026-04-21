@@ -3,7 +3,7 @@
 Scans repos for actionable improvements when the queue is empty.
 Creates GitHub issues and adds them to the project board.
 
-Most scans are deterministic (TODO tags, deps, security — zero LLM tokens).
+Most scans are deterministic (annotation tags, deps, security — zero LLM tokens).
 Vision-gap scanning (scan_vision) calls Claude Sonnet to compare
 project-visions.md against existing open issues.
 """
