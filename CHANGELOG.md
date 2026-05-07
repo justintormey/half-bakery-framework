@@ -6,6 +6,87 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
+## [2.2.1] — 2026-05-07
+
+### Summary
+
+Patch release: two dispatcher bugs that became visible during a long-running
+multi-phase project. Both bugs were silent failures — work appeared to "complete"
+but burned API credits or routed to the wrong agent type.
+
+---
+
+### 🐛 Bug Fixes
+
+#### Dispatcher: merge-retry cap bypass caused infinite loop (`scripts/dispatcher.py`)
+
+When a worktree's auto-merge failed N times (default `max_merge_retries=3`), the
+cap-hit logic prefixed the issue title with `[Review]` and moved the issue to the
+`Review` column. But `Review` is a *dispatchable* column — every cycle the
+dispatcher spawned a `review` agent against the same conflicted branch, which
+re-tried the merge, which failed, which incremented the counter past the cap.
+The counter grew unbounded; observed in production reaching the high hundreds
+before manual intervention. Each loop iteration cost the price of a `review`
+agent run — meaningful budget burn.
+
+**Fix:** at cap, route the issue to `Stuck` (which is in `non_dispatchable`)
+with a `[Stuck]` title prefix instead of `[Review]`. The dispatch loop and board
+hygiene both skip `[Stuck]`-prefixed Stuck items. Re-dispatch requires a human
+to resolve the underlying conflict, remove the prefix, and move the issue back
+to `Ready`. The issue comment now spells out this recovery procedure.
+
+This mirrors the existing skeptic-rejection cap behavior, which already routed
+to `Stuck` correctly. The merge-retry path was inconsistent.
+
+#### Issue classifier biased toward `docs`/`design` over `engineering` (`scripts/evaluator.py`)
+
+`classify_issue` summed keyword hits and called `max(scores, key=scores.get)`,
+which returns the *first* key with the maximum score. Because
+`CLASSIFY_KEYWORDS` is iterated in declaration order (`docs, design,
+engineering`), any tie between docs/design and engineering went to whichever
+came first in the dict. Real-world impact: an engineering issue with a single
+incidental "documentation" mention routed to the `documentarian` agent, which
+produced zero commits. Multi-phase rollouts where each phase touches a
+`history.md` file and references "docs/runbook" paths consistently misclassified.
+
+**Fixes:**
+- **Title weighting**: title hits now weighted 3x. Titles are the strongest
+  signal of intent; bodies often mention "docs/design" in passing.
+- **Engineering bias**: `docs`/`design` only wins when its score is BOTH
+  `>= 2x engineering` AND `>= 5` absolute. Otherwise `engineering` wins. The
+  asymmetry is deliberate: an engineering agent on a docs issue still produces
+  useful output (it'll write the docs); the inverse (documentarian agent on
+  an engineering issue) produces nothing usable.
+- **Manual override**: a line matching `^pipeline\s*:\s*(engineering|docs|design)$`
+  anywhere in the body forces the route, bypassing keyword scoring. Useful for
+  edge cases where the issue is genuinely engineering work but the body
+  legitimately scores docs-heavy (e.g., adding docs alongside code changes).
+
+#### Backlog status not sticky against UI/automation races
+
+Documented (no code change): when an operator manually sets a project board
+status via the GitHub UI, or when GitHub Projects' "auto-add new issues"
+automation races a tool's `updateProjectV2ItemFieldValue` mutation, the
+intended status can be silently overwritten. The dispatcher's `_fix_board_orphans`
+does not move `Backlog` items to `Ready`, so this is not a dispatcher bug —
+it's a workflow consideration.
+
+**Recommended pattern** for staged sub-issue rollouts: control gating via the
+Epic's status (Epic-gate skips all sub-issues when the parent is in any
+non-Ready status), not via individual sub-issue Backlog status. Sub-issue
+status can drift independently of the gating decision.
+
+---
+
+### 🔍 Discoverability improvements
+
+- Dispatcher comments at cap-hit now include the recovery procedure (resolve
+  conflict, remove `[Stuck]` prefix, move to Ready).
+- New cap-hit log line is distinct: `... — CAP HIT, moving to Stuck` so it's
+  trivially `grep`-able when scanning for terminal failures.
+
+---
+
 ## [2.2.0] — 2026-04-20
 
 ### Summary

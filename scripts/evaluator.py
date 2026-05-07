@@ -315,18 +315,52 @@ CLASSIFY_KEYWORDS = {
 
 
 def classify_issue(title, body):
-    """Classify an issue into a pipeline template. Returns (type, pipeline)."""
-    text = f"{title} {body}".lower()
+    """Classify an issue into a pipeline template. Returns (type, pipeline).
+
+    Honors an explicit `pipeline: engineering|docs|design` line anywhere in
+    the body (case-insensitive) as an override before keyword scoring.
+
+    Scoring:
+      - Title hits weighted 3x (titles are the strongest signal of intent;
+        bodies often mention "docs/design" in passing for engineering work).
+      - Engineering bias: docs/design must score >= 2x engineering AND >= 5
+        absolute to win. Otherwise engineering wins. Misclassifying engineering
+        work as docs/design wastes a documentarian/designer agent on code work
+        and produces no commits; the inverse (engineering agent on a docs
+        issue) is much cheaper because the agent will still write the docs.
+      - On a tie, engineering wins.
+    """
+    title_lower = (title or "").lower()
+    body_lower = (body or "").lower()
+
+    # Explicit override: `pipeline: engineering` line in body wins
+    m = re.search(r'^\s*pipeline\s*:\s*(engineering|docs|design)\s*$',
+                  body_lower, re.MULTILINE)
+    if m:
+        kind = m.group(1)
+        return kind, PIPELINE_TEMPLATES[kind]
 
     scores = {}
     for issue_type, keywords in CLASSIFY_KEYWORDS.items():
-        score = sum(1 for kw in keywords if re.search(r'\b' + re.escape(kw) + r'\b', text))
-        if score > 0:
-            scores[issue_type] = score
+        title_hits = sum(1 for kw in keywords if re.search(r'\b' + re.escape(kw) + r'\b', title_lower))
+        body_hits = sum(1 for kw in keywords if re.search(r'\b' + re.escape(kw) + r'\b', body_lower))
+        score = title_hits * 3 + body_hits
+        scores[issue_type] = score
 
-    if scores:
-        best = max(scores, key=scores.get)
-        return best, PIPELINE_TEMPLATES[best]
+    eng = scores.get("engineering", 0)
+    docs = scores.get("docs", 0)
+    design = scores.get("design", 0)
 
-    # Default to engineering pipeline
+    # Engineering bias: only route to docs/design if their signal is
+    # strongly dominant (>= 2x engineering AND >= 5 absolute hits).
+    candidates = []
+    for kind, score in (("docs", docs), ("design", design)):
+        if score >= max(2 * eng, 5):
+            candidates.append((kind, score))
+
+    if candidates:
+        # Pick highest-scoring docs/design candidate
+        best_kind = max(candidates, key=lambda c: c[1])[0]
+        return best_kind, PIPELINE_TEMPLATES[best_kind]
+
     return "engineering", PIPELINE_TEMPLATES["engineering"]

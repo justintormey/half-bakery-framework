@@ -2217,29 +2217,49 @@ def phase_harvest(state, config, fields_cache, routes):
                     count += 1
                     merge_retries[cid] = count
 
-                log.warning("%s for issue %s (attempt %d/%d), moving to Review",
-                            label, cid, count, max_merge_retries)
-                gh_issue_comment(repo, issue_number,
-                    f"**{label}** (merge attempt {count}/{max_merge_retries}) — moving to Review.\n\n"
-                    f"Branch `{info.get('branch', '')}` preserved for manual merging.\n\n"
-                    f"Agent type: `{info['agent']}`\n"
-                    f"Error: `{merge_error}`")
-
-                # At cap: prepend `[Review]` to the issue title so that
-                # _fix_board_orphans no longer auto-returns it to Ready on the
-                # next cycle. Requires human intervention to clear.
+                # At cap: move to Stuck (non_dispatchable) with [Stuck] prefix to
+                # break the infinite loop. The Review column dispatches the review
+                # agent every cycle, which triggers another merge attempt — without
+                # the cap-hit terminating the loop, count grows unbounded. Observed
+                # in production: counters reaching 500+ before manual intervention,
+                # burning API credits on agents that did nothing useful each cycle.
                 if count >= max_merge_retries:
+                    target_col = "Stuck" if fields_cache["fields"]["Status"]["options"].get("Stuck") else "Review"
                     title = info.get("title", "")
-                    if title and not title.startswith("[Review]"):
-                        new_title = f"[Review] {title}"
-                        log.warning("Merge retry cap hit for %s — prefixing title with [Review]", cid)
+                    new_title = title
+                    # Strip any prior [Review] prefix from a previous attempt and
+                    # ensure exactly one [Stuck] prefix.
+                    if new_title.startswith("[Review] "):
+                        new_title = new_title[len("[Review] "):]
+                    if new_title and not new_title.startswith("[Stuck]"):
+                        new_title = f"[Stuck] {new_title}"
+                    if new_title != title:
+                        log.warning("Merge retry cap hit for %s (count=%d/%d) — marking [Stuck] and parking",
+                                    cid, count, max_merge_retries)
                         subprocess.run(
                             ["gh", "issue", "edit", str(issue_number),
                              "--repo", repo, "--title", new_title],
                             capture_output=True, text=True,
                         )
-
-                move_issue_to_column(fields_cache, info.get("item_id", ""), "Review")
+                    log.warning("%s for issue %s (attempt %d/%d) — CAP HIT, moving to %s",
+                                label, cid, count, max_merge_retries, target_col)
+                    gh_issue_comment(repo, issue_number,
+                        f"**{label}** (merge attempt {count}/{max_merge_retries}) — **cap reached, moved to {target_col}**.\n\n"
+                        f"Branch `{info.get('branch', '')}` preserved for manual merging.\n\n"
+                        f"Agent type: `{info['agent']}`\n"
+                        f"Error: `{merge_error}`\n\n"
+                        f"To re-dispatch: resolve the merge conflict manually, "
+                        f"remove the `[Stuck]` title prefix, and move to Ready.")
+                    move_issue_to_column(fields_cache, info.get("item_id", ""), target_col)
+                else:
+                    log.warning("%s for issue %s (attempt %d/%d), moving to Review",
+                                label, cid, count, max_merge_retries)
+                    gh_issue_comment(repo, issue_number,
+                        f"**{label}** (merge attempt {count}/{max_merge_retries}) — moving to Review.\n\n"
+                        f"Branch `{info.get('branch', '')}` preserved for manual merging.\n\n"
+                        f"Agent type: `{info['agent']}`\n"
+                        f"Error: `{merge_error}`")
+                    move_issue_to_column(fields_cache, info.get("item_id", ""), "Review")
             else:
                 # Merge succeeded — reset the retry counter. If a prior cap was
                 # hit and the title was prefixed with [Review], a human has
