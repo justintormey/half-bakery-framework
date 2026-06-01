@@ -88,7 +88,9 @@ The Half Bakery Framework is a public, sanitized version of Justin's private `ha
 
 ## Current Status
 
-🟢 **active** — v2.2.1 released 2026-05-07. System is in daily production use on the private `justintormey/half-bakery` instance. Public framework repo is kept in sync.
+🔴 **retired** — 2026-05-25. Both the private `half-bakery` system and this public framework were shut down. The dispatcher no longer runs anywhere, the GitHub Project board is closed, and the repos were archived (this one later re-opened to the public as a learning artifact). Retirement reason (Justin): *"both the Half Bakery and the Half Bakery Framework are busted. Too much hassle for what they're worth."* See [KNOWN_ISSUES.md](KNOWN_ISSUES.md) for the full postmortem.
+
+Last active release was v2.2.1 (2026-05-07). For ~18 days after a major QA audit closed a dozen bugs, the system kept surfacing new silent-failure modes, and the operational cost outweighed the output. History below is preserved as-is from when it was live.
 
 ---
 

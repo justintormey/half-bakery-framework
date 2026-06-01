@@ -1,5 +1,26 @@
 # The Half Bakery Framework
 
+> ## ⚠️ Retired & not maintained — and it never fully worked
+>
+> **Status: Retired 2026-05-25.** This repo is public as a learning artifact, not
+> a working product. No one is maintaining it; issues and pull requests are
+> unlikely to be answered.
+>
+> In the author's own words at retirement:
+> *"Sadly, both the Half Bakery and the Half Bakery Framework are busted. Too
+> much hassle for what they're worth."*
+>
+> It did real work and shipped real features — but it was never reliable, its
+> central "evaluate before advancing" guarantee had a hole (work reached `Done`
+> with the code stranded, unmerged), and its failure modes were almost all
+> *silent*, so it demanded constant supervision.
+>
+> **👉 Read [KNOWN_ISSUES.md](KNOWN_ISSUES.md) before trusting anything below.**
+> It is an honest postmortem of what broke and why. The rest of this README
+> describes how the system was *meant* to work — treat it as a design essay, and
+> note that parts of it have **drifted from the actual code** (see the callouts
+> below and in KNOWN_ISSUES).
+
 **Your ideas are half-baked. Let the agents finish cooking.**
 
 Half Bakery turns GitHub Issues into autonomous [Claude](https://claude.ai) agent work sessions. Write a ticket, drag it to "Ready," and walk away. A Python dispatcher picks it up, routes it to the right specialist agent, runs it through a verification pipeline — engineering, QA, skeptic review, docs — and only advances when the work actually passes evaluation.
@@ -30,6 +51,12 @@ No orchestration framework. No token-burning coordination layer. Just a cron job
 ```
 
 ## What's New in v2.1.0
+
+> **⚠️ Stale section.** This "What's New" stops at v2.1.0 but the shipped code is
+> at **v2.2.1** (see `CHANGELOG.md`). v2.2 simplified 8 pipelines → 3
+> (`engineering` / `design` / `docs`) and merged the `qa` + `skeptic` agents into
+> a single `review` agent. The pipeline and agent tables further down describe the
+> older, pre-v2.2 world. See [KNOWN_ISSUES.md](KNOWN_ISSUES.md#docs-dont-match-the-code).
 
 - **BudgetTracker class** — shared concurrency-slot tracker keeps dispatch phases in sync without re-reading state mid-loop
 - **Automatic state migration** — `migrate_state()` runs on every boot; upgrades `state.json` schema without manual wipes
@@ -139,6 +166,12 @@ launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.halfbakery.dispatche
 - `PATH` includes `~/.local/bin` (where the claude binary lives)
 
 ## The Agents
+
+> **⚠️ Reality check.** This table lists **seven** agents, but the shipped
+> `agents/` directory contains only **four**: `founding-engineer`, `review`,
+> `documentarian`, and `designer`. As of v2.2, `qa` + `skeptic` were merged into
+> `review`, and the `research-analyst` + `architect` stages were dropped. The
+> seven-agent pipeline below describes the pre-v2.2 design, not the running code.
 
 Seven specialists, each with a persona and clear boundaries:
 
@@ -349,7 +382,10 @@ python3 scripts/deployer.py deploy my-project
 
 ## Contributing
 
-PRs welcome. The system is pure Python stdlib + `gh` CLI. Agent personas are just markdown.
+**This project is retired and not maintained** — issues and PRs are unlikely to
+be reviewed or merged (see [KNOWN_ISSUES.md](KNOWN_ISSUES.md)). You're welcome to
+fork it and take it somewhere new. The system is pure Python stdlib + `gh` CLI,
+and the agent personas are just markdown, so it's easy to lift parts out.
 
 ## License
 

@@ -47,13 +47,24 @@ docs/                    # Architecture docs, RFCs, design specs
 
 ## Current Status
 
-- ✅ v2.1.1 released (public repo commit `53e3a76`)
-- ✅ 6-gate evaluation before advancing any agent output
-- ✅ Skeptic/QA merged into Review agent (v2.2 in private system)
+🔴 **RETIRED 2026-05-25 — not maintained.** The dispatcher no longer runs; the
+private upstream and this public repo were both shut down. This repo is public
+only as a learning artifact. See `KNOWN_ISSUES.md` for the postmortem and
+`history.md` for the full timeline. Retirement reason: *"both the Half Bakery and
+the Half Bakery Framework are busted. Too much hassle for what they're worth."*
+
+Last live state (preserved for reference):
+
+- ✅ v2.1.1 released (public repo commit `53e3a76`); code later reached v2.2.1
+- ✅ 6-gate evaluation before advancing any agent output — but the gates ran in
+  the agent worktree and did **not** verify the final shipped state, which is how
+  work reached `Done` unmerged ("the board lied" — see `KNOWN_ISSUES.md`)
+- ✅ Skeptic/QA merged into Review agent (v2.2)
 - ✅ Budget tracking, time-of-day scheduling, usage ceilings
 - ✅ Vision-driven discovery (auto-creates issues from project-visions.md gaps)
 - ✅ Local LLM provider support (local_agent.py)
-- ⏳ v2.2 sync pending: simplified 3-pipeline model not yet synced to public repo
+- ⚠️ The README and parts of this brief drifted from the shipped code (7 agents
+  documented vs 4 shipped; v2.1.0 "What's New" vs v2.2.1 code).
 
 ## Key Decisions & Architecture Notes
 
